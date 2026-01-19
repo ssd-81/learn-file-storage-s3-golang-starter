@@ -3,3 +3,21 @@ out
 .env
 assets/
 samples/
+
+# AWS
+.aws/
+**/.aws/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Keys
+*.pem
+*.key
+*.crt
+
+# Local configs
+config.local.*
+secrets.*

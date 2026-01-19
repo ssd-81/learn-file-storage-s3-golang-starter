@@ -10,3 +10,4 @@ func (cfg apiConfig) ensureAssetsDir() error {
 	}
 	return nil
 }
+
