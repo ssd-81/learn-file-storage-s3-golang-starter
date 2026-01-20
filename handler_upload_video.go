@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
+	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/ffprobe"
 	"github.com/google/uuid"
 )
 
@@ -80,6 +81,9 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "video could not be created (temp)", err)
 		return 
 	}
+	
+	
+
 	defer os.Remove(tempFile.Name()) // check on this method; why "tubely-video.mp4" can't be used
 	defer tempFile.Close()
 
@@ -88,7 +92,17 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "could not move files from wire to temp files", err)
 		return 
 	}
+	aspRatio , err := ffprobe.GetVideoAspectRatio(tempFile.Name())
+	fmt.Println(">>>>>>", aspRatio, "<<<<<<<")
+	var view string 
 
+	if aspRatio == "16:9" {
+		view = "landscape"
+	}else if (aspRatio == "9:16") {
+		view = "portrait"
+	}else {
+		view = "other"
+	}
 
 	fmt.Println("file copied to local system")
 	tempFile.Seek(0, io.SeekStart) // setting the file's pointer back to beginning
@@ -102,7 +116,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	encoder.Close()
 
 
-	fName := fmt.Sprintf("%v.%v", buf.String(), "mp4") // hardcoded mp4 for now; check handler_upload_thumbnail to make changes
+	fName := fmt.Sprintf("%v/%v.%v", view, buf.String(), "mp4") // hardcoded mp4 for now; check handler_upload_thumbnail to make changes
 	inputParams := s3.PutObjectInput{
 		Bucket: &cfg.s3Bucket,
 		Key: &fName,
