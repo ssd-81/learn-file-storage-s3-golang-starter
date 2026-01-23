@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -13,8 +14,32 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/ffprobe"
+
 	"github.com/google/uuid"
 )
+
+// func (cfg *apiConfig) dbVideoToSignedVideo(video database.Video) (database.Video, error){
+
+// 	if video.VideoURL == nil {
+//         return video, nil
+//     }
+//     parts := strings.Split(*video.VideoURL, ",")
+//     if len(parts) < 2 {
+//         return video, nil
+//     }
+// 	fmt.Println("raw video URL:", *video.VideoURL)
+// 	fmt.Println("parts:", parts)
+// 	bucket, key := parts[0], parts[1] // double check if these values are as expected
+// 	url, err := upload.GeneratePresignedURL(cfg.s3Client, bucket, key, 5 * time.Minute)
+// 	if err != nil {
+// 		fmt.Println("error encountered (GeneratePresignedURL)", err)
+// 		return video, err // not certain if the same video object should be returned
+// 	}
+// 	video.VideoURL = &url
+// 	return video, nil
+
+// }
+
 
 func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request) {
 	// 1 << 30 bytes 
@@ -96,16 +121,42 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	fmt.Println(">>>>>>", aspRatio, "<<<<<<<")
 	var view string 
 
-	if aspRatio == "16:9" {
+	switch aspRatio {
+	case "16:9":
 		view = "landscape"
-	}else if (aspRatio == "9:16") {
+	case "9:16":
 		view = "portrait"
-	}else {
+	default:
 		view = "other"
 	}
 
 	fmt.Println("file copied to local system")
 	tempFile.Seek(0, io.SeekStart) // setting the file's pointer back to beginning
+	newPath, err := ffprobe.ProcessVideoForFastStart(tempFile.Name())
+	if err != nil {
+		log.Printf("error while converting video to fast video")
+		respondWithError(w, http.StatusInternalServerError, "fast encoding conversion failed", err)
+		return 
+	}
+	defer os.Remove(newPath)
+
+
+	fastFile, err := os.Open(newPath)
+	if err != nil {
+		log.Printf("fast encoded file could not be opened")
+		respondWithError(w, http.StatusInternalServerError, "fast encoded file could not be opened", err)
+		return 
+	}
+	
+	// checking if newly created file is empty
+	fastFileInfo, err:= fastFile.Stat()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "newly created fast file info not found", err)
+		return 
+	}
+	fmt.Println("the size of the file is: ")
+	fmt.Println(fastFileInfo.Size())
+
 
 	// generating a random 32 bit integer filename 
 	key := make([]byte, 32)
@@ -120,16 +171,28 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	inputParams := s3.PutObjectInput{
 		Bucket: &cfg.s3Bucket,
 		Key: &fName,
-		Body: tempFile,
+		Body: fastFile,
 		ContentType: &mediaType,
 	}
-	cfg.s3Client.PutObject(r.Context(), &inputParams)
-	// make sure it is fName and not fName
-	updatedUrl := fmt.Sprintf("https://%v.s3.%v.amazonaws.com/%v", cfg.s3Bucket, cfg.s3Region, fName)
+	_, err = cfg.s3Client.PutObject(r.Context(), &inputParams)
+	if(err != nil) {
+		fmt.Println("PutObject ERROR:", err)
+		respondWithError(w, http.StatusInternalServerError, "Error uploading file to S3", err)
+		return
+	}
+	
+	// updatedUrl := fmt.Sprintf("https://%v.s3.%v.amazonaws.com/%v", cfg.s3Bucket, cfg.s3Region, fName)
+	// made a blunder by passing memory address rather than actual value 
+	// and I don't know why go accepted that in the first place; my mistake completely
+	updatedUrl := fmt.Sprintf("%v,%v", cfg.s3Bucket, *inputParams.Key)
 	video.VideoURL = &updatedUrl // unused write; check that on again 
+	// video, err = cfg.dbVideoToSignedVideo(video)
+	
 	err = cfg.db.UpdateVideo(video)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "video url not updated", err)
 		return 
 	}
 }
+
+

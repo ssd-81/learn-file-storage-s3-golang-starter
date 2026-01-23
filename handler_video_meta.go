@@ -6,6 +6,7 @@ import (
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
+
 	"github.com/google/uuid"
 )
 
@@ -94,6 +95,11 @@ func (cfg *apiConfig) handlerVideoGet(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusNotFound, "Couldn't get video", err)
 		return
 	}
+	// video, err = cfg.dbVideoToSignedVideo(video)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusInternalServerError, "temporary link to video could not be created", err)
+	// 	return
+	// }
 
 	respondWithJSON(w, http.StatusOK, video)
 }
@@ -115,7 +121,15 @@ func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Reque
 		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve videos", err)
 		return
 	}
+	// for _, vid := range videos {
+	// 	vid, err = cfg.dbVideoToSignedVideo(vid)
+	// 	if(err != nil ) {
+	// 		respondWithError(w, http.StatusInternalServerError, "temporary video link not created", err)
+	// 		return 
+	// 	}
+	// }
 
 	respondWithJSON(w, http.StatusOK, videos)
 }
+
 
