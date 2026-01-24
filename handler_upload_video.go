@@ -184,9 +184,14 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	// updatedUrl := fmt.Sprintf("https://%v.s3.%v.amazonaws.com/%v", cfg.s3Bucket, cfg.s3Region, fName)
 	// made a blunder by passing memory address rather than actual value 
 	// and I don't know why go accepted that in the first place; my mistake completely
-	updatedUrl := fmt.Sprintf("%v,%v", cfg.s3Bucket, *inputParams.Key)
-	video.VideoURL = &updatedUrl // unused write; check that on again 
+	// updatedUrl := fmt.Sprintf("%v,%v", cfg.s3Bucket, *inputParams.Key)
+	// video.VideoURL = &updatedUrl // unused write; check that on again 
 	// video, err = cfg.dbVideoToSignedVideo(video)
+
+	// updating video url to cdn url in place of temporarily accessible URL
+	updatedUrl := fmt.Sprintf("%v%v", cfg.s3CfDistribution, *inputParams.Key)
+	fmt.Println(updatedUrl)
+	video.VideoURL = &updatedUrl
 	
 	err = cfg.db.UpdateVideo(video)
 	if err != nil {
